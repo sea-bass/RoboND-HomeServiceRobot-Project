@@ -7,8 +7,8 @@
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
-// Define pickup position threshold (in meters)
-#define PICKUP_THRESHOLD 0.2f
+// Define pickup and dropoff position threshold (in meters)
+#define POSE_THRESHOLD 0.2f
 
 // Create a pose listener class to handle the pose
 class PoseListener
@@ -17,6 +17,7 @@ public:
   float pickupPos[2];
   float dropoffPos[2];
   bool pickupReached;
+  bool dropoffReached;
   visualization_msgs::Marker marker;
   ros::Publisher marker_pub;
   void callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg);
@@ -31,15 +32,15 @@ void PoseListener::callback(const geometry_msgs::PoseWithCovarianceStamped::Cons
     // ROS_INFO("I heard: [%f %f]", x, y);
   
     // Delete the marker once pickup location is reached
-    if ((!this->pickupReached) && (sqrt( pow(x-pickupPos[0],2) + pow(y-pickupPos[1],2) ) < PICKUP_THRESHOLD)) {
-      // Delete the marker
+    if ((!this->pickupReached) && (sqrt( pow(x-pickupPos[0],2) + pow(y-pickupPos[1],2) ) < POSE_THRESHOLD)) {
       ROS_INFO("Pickup location reached. Deleting pickup marker");
       this->marker.action = visualization_msgs::Marker::DELETE;
       this->marker_pub.publish(this->marker);
       this->pickupReached = true;
-      
-      // Then, wait 5 seconds and publish elsewhere
-      ros::Duration(5.0).sleep();
+    }
+  
+    // Spawn the marker at the dropoff location once reached
+    if ((!this->dropoffReached) && (sqrt( pow(x-dropoffPos[0],2) + pow(y-dropoffPos[1],2) ) < POSE_THRESHOLD)) {
       ROS_INFO("Publishing marker at dropoff location");
       this->marker.action = visualization_msgs::Marker::ADD;
       this->marker.pose.position.x = this->dropoffPos[0];
@@ -49,8 +50,8 @@ void PoseListener::callback(const geometry_msgs::PoseWithCovarianceStamped::Cons
       this->marker.color.b = 0.0f;
       this->marker.color.a = 1.0;
       this->marker_pub.publish(this->marker);
+      this->dropoffReached = true;
     }
-
 }
 
 int main( int argc, char** argv )
@@ -58,6 +59,7 @@ int main( int argc, char** argv )
   // Create listener class with pickup and dropoff positions
   PoseListener listener;
   listener.pickupReached = false;
+  listener.dropoffReached = false;
   listener.pickupPos[0] = 6.0; // X
   listener.pickupPos[1] = 4.0; // Y
   listener.dropoffPos[0] = 0.0; // X
